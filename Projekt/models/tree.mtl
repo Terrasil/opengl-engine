@@ -1,0 +1,22 @@
+# Blender 3.3.1 MTL File: 'tree2.blend'
+# www.blender.org
+
+newmtl Material.003
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd -s 5 5 5 G:/UG/OpenGL/old-wooden-texture-cover-from-planks-ui-game-background-seamless-pattern-cartoon_191307-824.png
+
+newmtl Material.004
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd -s 6 6 6 G:/UG/OpenGL/istockphoto-1320831587-612x612.jpg
