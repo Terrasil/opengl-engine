@@ -36,8 +36,8 @@ glm::mat4 minimapProj;
 glm::mat4 lightProj;
 glm::mat4 matView = glm::mat4(1.0);
 
-std::vector<Model> models;
 std::vector<Sprite> sprites;
+std::vector<Model> models;
 
 Sprite* rockIcon;
 Sprite* woodIcon;
@@ -63,11 +63,102 @@ GLuint postprocessRBO;
 GLuint shadowFBO;
 GLuint shadowTexture;
 
+std::vector<glm::vec2> treeMultiMeshPositions;
+std::vector<glm::vec2> rockMultiMeshPositions;
+
 Texture* postProcessTexture = new Texture();
 Texture* miniMapTexture = new Texture();
 
 int woodCount = 1;
 int rockCount = 2;
+
+int castleCount = 0;
+int sawmillCount = 0;
+int mineCount = 0;
+int houseCount = 0;
+
+int selected = 0;
+std::string selectedName = "castle";
+
+unsigned char* newData = new unsigned char[256 * 256 * 4];
+unsigned int main_seed = 123456u;
+std::vector<Model> buildings;
+int needWood(std::string name) {
+	if (name == "sawmill") {
+		return std::pow(2, sawmillCount) / 2;
+	}
+	if (name == "mine") {
+		return mineCount;
+	}
+	if (name == "house") {
+		return std::pow(2, houseCount);
+	}
+	else {
+		return 0;
+	}
+}
+int needRock(std::string name) {
+	if (name == "sawmill") {
+		return sawmillCount * 2;
+	}
+	if (name == "mine") {
+		return std::pow(2, houseCount) / 2;
+	}
+	if (name == "house") {
+		return std::pow(2, houseCount) / 2;
+	}
+	else {
+		return 0;
+	}
+}
+bool buildingDistance(float mx, float my) {
+	float minDistance = 1000.0;
+	if (buildings.empty()) return true;
+	for (Model model : buildings) {
+		float distance = glm::distance(glm::vec2(mx, my), model.getMesh()->getPosition());
+		if (distance < minDistance) minDistance = distance;
+	}
+	return minDistance > 2.0 && minDistance < 4.0;
+}
+bool treeDistance(float mx, float my) {
+	float minDistance = 1000.0;
+	for (glm::vec2 pos : treeMultiMeshPositions) {
+		float distance = glm::distance(glm::vec2(mx, my), pos);
+		if (distance < minDistance) minDistance = distance;
+	}
+	if (selected == 1 && minDistance > 3.0) return false;
+	return minDistance > 0.75;
+}
+bool rockDistance(float mx, float my) {
+	float minDistance = 1000.0;
+	for (glm::vec2 pos : rockMultiMeshPositions) {
+		float distance = glm::distance(glm::vec2(mx, my), pos);
+		if (distance < minDistance) minDistance = distance;
+	}
+	if (selected == 2 && minDistance > 3.0) return false;
+	return minDistance > 0.75;
+}
+int validSpot(glm::vec2 pos) {
+	// water distance
+	int x = ((int)pos.x + 64.0f) * (256.0f / 128.0f);
+	int y = ((int)pos.y + 64.0f) * (256.0f / 128.0f);
+	bool newState = (int)newData[(x + (256 - y) * 256) * 4] > ((selected == 0) ? 110 : 106);
+	//castle
+	if (selected == 0 && castleCount > 0) newState = false;
+	if (selected != 0 && castleCount == 0) newState = false;
+	//rock needed
+	if(needRock(selectedName) > rockCount) newState = false;
+	//wood needed
+	if (needWood(selectedName) > woodCount) newState = false;
+	//space allowed
+		// other building
+		if(!buildingDistance(pos.x, pos.y)) newState = false;
+		// enviroment
+		if (!treeDistance(pos.x, pos.y)) newState = false;
+		if (!rockDistance(pos.x, pos.y)) newState = false;
+		
+	return (newState) ? 1 : 2;
+}
 
 // ---------------------------------------------------
 void DisplayScene()
@@ -81,7 +172,7 @@ void DisplayScene()
 	// Wyliczanie macierz widoku
 	// ------------------------------------------------------------
 	matView = UpdateViewMatrix();
-
+	CameraMatProj = matProj;
 	// -----------------------------------------------
 	// NOWE : wyliczanie pozycji kamery z matView
 	// -----------------------------------------------
@@ -89,12 +180,29 @@ void DisplayScene()
 	Renderer::getInstance().getSkyBoxes().at(Settings::getInstance().skyBox)->setPosition(cameraPos);
 	Renderer::getInstance().getSkyBoxes().at(Settings::getInstance().skyBox)->draw(matProj, matView);
 	Renderer::getInstance().getTerrain()->draw(cameraPos, matProj, matView); // terrain
-	for (Model model : models) {
-		//model.draw(cameraPos, matProj, matView);
-	}
 	Renderer::getInstance().getRocks()->draw(assetsRepository->getProgram("multimesh"), multiMeshMatrix, cameraPos, matProj, matView, testMultiMeshMaterial, multiMeshColor); // rock
 	Renderer::getInstance().getTrees()->draw(assetsRepository->getProgram("multimesh"), multiMeshMatrix, cameraPos, matProj, matView, testMultiMeshMaterial, multiMeshColor); // trees
 	Renderer::getInstance().getWater()->draw(cameraPos, matProj, matView); // water
+	glReadPixels(_mouse_X, glutGet(GLUT_WINDOW_HEIGHT) - _mouse_Y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
+
+	int idx = 0;
+	for (Model model : models) {
+		if (idx != selected) {
+			idx++;
+			continue;
+		}
+		model.getMesh()->setState(validSpot(glm::vec2(worldPoint.x, worldPoint.z)));
+		model.setMatrix(glm::translate(model.getMatrix(), worldPoint));
+		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
+		model.setPosition(glm::vec2(worldPoint.x, worldPoint.z));
+		model.draw(cameraPos, matProj, matView);
+		idx++;
+	}
+	for (Model model : buildings) {
+		model.getMesh()->setState(0);
+		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
+		model.draw(cameraPos, matProj, matView);
+	}
 }
 void Minimap()
 {
@@ -113,16 +221,18 @@ void Minimap()
 		glm::vec3(cameraPos.x, 0, cameraPos.z),
 		glm::vec3(0.0, 1.0, 1.0)
 	);
-
 	Renderer::getInstance().getTerrain()->draw(cameraPos, minimapProj, matView);
-	for (Model model : models) {
-		//model.draw(cameraPos, minimapProj, matView);
+	for (Model model : buildings) {
+		model.getMesh()->setState(0);
+		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
+		model.draw(cameraPos, minimapProj, matView);
 	}
 	Renderer::getInstance().getRocks()->draw(assetsRepository->getProgram("multimesh"), multiMeshMatrix, cameraPos, minimapProj, matView, testMultiMeshMaterial, multiMeshColor); // rocks
 	Renderer::getInstance().getTrees()->draw(assetsRepository->getProgram("multimesh"), multiMeshMatrix, cameraPos, minimapProj, matView, testMultiMeshMaterial, multiMeshColor); // trees
 	Renderer::getInstance().getWater()->draw(cameraPos, minimapProj, matView);
 	Settings::getInstance().lightVisibility = lightState;
 }
+
 void Shadows()
 {
 	glViewport(0, 0, 16384, 16384);
@@ -152,8 +262,23 @@ void Shadows()
 	glm::mat4 lightView = glm::lookAt(lightPosition, Light_Direction, glm::vec3(0.0f, 1.0f, 0.0f));
 	Renderer::getInstance().setLightView(lightView);
 	Renderer::getInstance().getTerrain()->draw(lightPosition, lightProj, lightView);
+
+	int idx = 0;
 	for (Model model : models) {
-		//model.draw(lightPosition, lightProj, lightView);
+		if (idx != selected) {
+			idx++;
+			continue; 
+		}
+		model.setMatrix(glm::translate(model.getMatrix(), worldPoint));
+		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
+		model.setPosition(glm::vec2(worldPoint.x, worldPoint.z));
+		model.draw(lightPosition, lightProj, lightView);
+		selectedName = model.name;
+		idx++;
+	}
+	for (Model model : buildings) {
+		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
+		model.draw(lightPosition, lightProj, lightView);
 	}
 	Renderer::getInstance().getRocks()->draw(assetsRepository->getProgram("multimesh"), multiMeshMatrix, lightPosition, lightProj, lightView, testMultiMeshMaterial, multiMeshColor); // rocks
 	Renderer::getInstance().getTrees()->draw(assetsRepository->getProgram("multimesh"), multiMeshMatrix, lightPosition, lightProj, lightView, testMultiMeshMaterial, multiMeshColor); // tree
@@ -179,6 +304,7 @@ void Render()
 	Minimap();
 	Shadows();
 	DisplayScene();
+	//glReadPixels(_mouse_X, glutGet(GLUT_WINDOW_HEIGHT) - _mouse_Y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -266,34 +392,34 @@ void Render()
 	RenderText(txt, 125.0, glutGet(GLUT_WINDOW_HEIGHT) - 340.0, 1.0f, glm::vec3(1.0));
 
 	//castle
-	int needRock = 10;
-	int needWood = 0;
-	RenderText("1", glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 235.0, 210.0, 1.0f, glm::vec3(1.0));
-	sprintf_s(txt, sizeof(txt), "%d", needRock);
-	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 225.0, 60.0, 1.0f, (rockCount < needRock) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
-	sprintf_s(txt, sizeof(txt), "%d", needWood);
-	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 225.0, 10.0, 1.0f, (woodCount < needWood) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
+	//int needRock = 10;
+	//int needWood = 0;
+	RenderText("1", glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 235.0, 210.0, 1.0f, (selected == 0) ? glm::vec3(1.0, 1.0, 0.0) : glm::vec3(1.0));
+	sprintf_s(txt, sizeof(txt), "%d", needRock("castle"));
+	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 225.0, 60.0, 1.0f, (rockCount < needRock("castle")) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
+	sprintf_s(txt, sizeof(txt), "%d", needWood("castle"));
+	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 225.0, 10.0, 1.0f, (woodCount < needWood("castle")) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
 
 	//sawmill
-	RenderText("2", glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 85.0, 210.0, 1.0f, glm::vec3(1.0));
-	sprintf_s(txt, sizeof(txt), "%d", needRock);
-	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 75.0, 60.0, 1.0f, (rockCount < needRock) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
-	sprintf_s(txt, sizeof(txt), "%d", needWood);
-	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 75.0, 10.0, 1.0f, (woodCount < needWood) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
+	RenderText("2", glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 85.0, 210.0, 1.0f, (selected == 1) ? glm::vec3(1.0, 1.0, 0.0) : glm::vec3(1.0));
+	sprintf_s(txt, sizeof(txt), "%d", needRock("sawmill"));
+	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 75.0, 60.0, 1.0f, (rockCount < needRock("sawmill")) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
+	sprintf_s(txt, sizeof(txt), "%d", needWood("sawmill"));
+	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 - 75.0, 10.0, 1.0f, (woodCount < needWood("sawmill")) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
 
 	//mine
-	RenderText("3", glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 65.0, 210.0, 1.0f, glm::vec3(1.0));
-	sprintf_s(txt, sizeof(txt), "%d", needRock);
-	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 75.0, 60.0, 1.0f, (rockCount < needRock) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
-	sprintf_s(txt, sizeof(txt), "%d", needWood);
-	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 75.0, 10.0, 1.0f, (woodCount < needWood) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
+	RenderText("3", glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 65.0, 210.0, 1.0f, (selected == 2) ? glm::vec3(1.0, 1.0, 0.0) : glm::vec3(1.0));
+	sprintf_s(txt, sizeof(txt), "%d", needRock("mine"));
+	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 75.0, 60.0, 1.0f, (rockCount < needRock("mine")) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
+	sprintf_s(txt, sizeof(txt), "%d", needWood("mine"));
+	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 75.0, 10.0, 1.0f, (woodCount < needWood("mine")) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
 
 	//house
-	RenderText("4", glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 215.0, 210.0, 1.0f, glm::vec3(1.0));
-	sprintf_s(txt, sizeof(txt), "%d", needRock);
-	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 225.0, 60.0, 1.0f, (rockCount < needRock) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
-	sprintf_s(txt, sizeof(txt), "%d", needWood);
-	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 225.0, 10.0, 1.0f, (woodCount < needWood) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
+	RenderText("4", glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 215.0, 210.0, 1.0f, (selected == 3) ? glm::vec3(1.0, 1.0, 0.0) : glm::vec3(1.0));
+	sprintf_s(txt, sizeof(txt), "%d", needRock("house"));
+	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 225.0, 60.0, 1.0f, (rockCount < needRock("house")) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
+	sprintf_s(txt, sizeof(txt), "%d", needWood("house"));
+	RenderText(txt, glutGet(GLUT_WINDOW_WIDTH) / 2.0 + 225.0, 10.0, 1.0f, (woodCount < needWood("house")) ? glm::vec3(1.0, 0.0, 0.0) : glm::vec3(0.0, 1.0, 0.0));
 
 	glBindVertexArray(0);
 	glUseProgram(0);
@@ -340,7 +466,7 @@ void Initialize()
 
 	glGenTextures(1, &postprocessDepth);
 	glBindTexture(GL_TEXTURE_2D, postprocessDepth);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT), 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT), 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, postprocessDepth, 0);
@@ -438,9 +564,8 @@ void Initialize()
 
 
 	// Heightmapa
-	const siv::PerlinNoise::seed_type seed = 123456u;
+	const siv::PerlinNoise::seed_type seed = main_seed;
 	const siv::PerlinNoise perlin{ seed };
-	unsigned char* newData = new unsigned char[256 * 256 * 4];
 	for (int y = 0; y < 256; ++y) {
 		for (int x = 0; x < 256; ++x) {
 			const double noise = perlin.octave2D_01((x * 0.01), (y * 0.01), 4);
@@ -471,7 +596,6 @@ void Initialize()
 	rockMultiMesh->setHeightmap(heightmap);
 
 	std::vector<glm::mat4x4> treeMultiMeshMatrixes;
-	std::vector<glm::vec2> treeMultiMeshPositions;
 	std::srand(static_cast<unsigned int>(time(NULL)));
 	std::mt19937 gen(seed);
 	for (int i = 0; i < 2000; ++i)
@@ -495,7 +619,6 @@ void Initialize()
 		treeMultiMeshMatrixes.push_back(treeMultiMeshMatrix);
 	}
 	std::vector<glm::mat4x4> rockMultiMeshMatrixes;
-	std::vector<glm::vec2> rockMultiMeshPositions2;
 	for (int i = 0; i < 100; ++i)
 	{
 		glm::mat4x4 rockMultiMeshMatrix = glm::mat4x4(1.0);
@@ -513,7 +636,7 @@ void Initialize()
 		float r = std::uniform_real_distribution<float>(-6.28, 6.28)(gen);
 		rockMultiMeshMatrix = glm::rotate(rockMultiMeshMatrix, r, glm::vec3(0.0f, 1.0f, 0.0f));
 		rockMultiMeshMatrix = glm::scale(rockMultiMeshMatrix, glm::vec3(0.1));
-		rockMultiMeshPositions2.push_back(glm::vec2(x, z));
+		rockMultiMeshPositions.push_back(glm::vec2(x, z));
 		rockMultiMeshMatrixes.push_back(rockMultiMeshMatrix);
 	}
 
@@ -521,7 +644,7 @@ void Initialize()
 	treeMultiMesh->setPositions(treeMultiMeshPositions);
 	Renderer::getInstance().setTrees(treeMultiMesh);
 	rockMultiMesh->setMatrixes(rockMultiMeshMatrixes);
-	rockMultiMesh->setPositions(rockMultiMeshPositions2);
+	rockMultiMesh->setPositions(rockMultiMeshPositions);
 	Renderer::getInstance().setRocks(rockMultiMesh);
 
 	assetsRepository->registerProgram("base");
@@ -567,6 +690,12 @@ void Initialize()
 	glAttachShader(waterProgram->getId(), LoadShader(GL_FRAGMENT_SHADER, "shaders/fragment-water.glsl"));
 	LinkAndValidateProgram(waterProgram->getId());
 	water->setProgram(waterProgram);
+
+	assetsRepository->registerProgram("building");
+	Program* buildingProgram = assetsRepository->getProgram("building");
+	glAttachShader(buildingProgram->getId(), LoadShader(GL_VERTEX_SHADER, "shaders/vertex-building.glsl"));
+	glAttachShader(buildingProgram->getId(), LoadShader(GL_FRAGMENT_SHADER, "shaders/fragment-building.glsl"));
+	LinkAndValidateProgram(buildingProgram->getId());
 
 	postProcessTexture->setId(postprocessTexture);
 	Sprite postprocessSprite;
@@ -657,15 +786,6 @@ void Initialize()
 	light->setIsDirectional(true);
 	Renderer::getInstance().addLights(light);
 
-	//Light* light2 = new Light();
-	//light2->setAmbient(glm::vec3(0.1, 0.1, 0.1));
-	//light2->setDiffuse(glm::vec3(1.0, 0.0, 0.0));
-	//light2->setSpecular(glm::vec3(1.0, 1.0, 1.0));
-	//light2->setAttenuation(glm::vec3(1.0, 0.0, 1.0));
-	//light2->setPosition(glm::vec3(1.0, 2.0, 0.0));
-	//light2->setIsDirectional(false);
-	//Renderer::getInstance().addLights(light2);
-
 	// Potok
 	glAttachShader(program->getId(), LoadShader(GL_VERTEX_SHADER, "shaders/vertex.glsl"));
 	glAttachShader(program->getId(), LoadShader(GL_FRAGMENT_SHADER, "shaders/fragment.glsl"));
@@ -691,6 +811,90 @@ void Initialize()
 	skyBox0->setProgram(program3);
 	skyBox0->init();
 	Renderer::getInstance().addSkyBox(skyBox0);
+
+	assetsRepository->registerTexture("castleBuilding", "textures/castle.png", GL_RGB);
+	Texture* castleBuilding = assetsRepository->getTexture("castleBuilding");
+	Material* castleMaterial = new Material();
+	castleMaterial->setAmbient(glm::vec3(0.2, 0.2, 0.2));
+	castleMaterial->setDiffuse(glm::vec3(1.0, 1.0, 1.0));
+	castleMaterial->setSpecular(glm::vec3(2.0, 2.0, 2.0));
+	castleMaterial->setShininess(32.0f);
+	Model castle;
+	castle.setMatrix(glm::mat4(1.0));
+	castle.setScale(glm::vec3(1.0));
+	assetsRepository->registerMesh("castle", "models/castle.obj");
+	Mesh* castleMesh = assetsRepository->getMesh("castle");
+	castleMesh->setTexture(castleBuilding);
+	castleMesh->setHeightmap(heightmap);
+	castleMesh->setPosition(glm::vec2(0.0));
+	castle.setMesh(castleMesh);
+	castle.setMaterial(castleMaterial);
+	castle.setProgram(buildingProgram);
+	castle.name = "castle";
+	models.push_back(castle);
+
+	assetsRepository->registerTexture("sawmillBuilding", "textures/sawmill.png", GL_RGB);
+	Texture* sawmillBuilding = assetsRepository->getTexture("sawmillBuilding");
+	Material* sawmillMaterial = new Material();
+	sawmillMaterial->setAmbient(glm::vec3(0.2, 0.2, 0.2));
+	sawmillMaterial->setDiffuse(glm::vec3(1.0, 1.0, 1.0));
+	sawmillMaterial->setSpecular(glm::vec3(2.0, 2.0, 2.0));
+	sawmillMaterial->setShininess(32.0f);
+	Model sawmill;
+	sawmill.setMatrix(glm::mat4(1.0));
+	sawmill.setScale(glm::vec3(0.3));
+	assetsRepository->registerMesh("sawmill", "models/sawmill.obj");
+	Mesh* sawmillMesh = assetsRepository->getMesh("sawmill");
+	sawmillMesh->setTexture(sawmillBuilding);
+	sawmillMesh->setHeightmap(heightmap);
+	sawmillMesh->setPosition(glm::vec2(0.0));
+	sawmill.setMesh(sawmillMesh);
+	sawmill.setMaterial(sawmillMaterial);
+	sawmill.setProgram(buildingProgram);
+	sawmill.name = "sawmill";
+	models.push_back(sawmill);
+
+	assetsRepository->registerTexture("mineBuilding", "textures/mine.png", GL_RGB);
+	Texture* mineBuilding = assetsRepository->getTexture("mineBuilding");
+	Material* mineMaterial = new Material();
+	mineMaterial->setAmbient(glm::vec3(0.2, 0.2, 0.2));
+	mineMaterial->setDiffuse(glm::vec3(1.0, 1.0, 1.0));
+	mineMaterial->setSpecular(glm::vec3(2.0, 2.0, 2.0));
+	mineMaterial->setShininess(32.0f);
+	Model mine;
+	mine.setMatrix(glm::mat4(1.0));
+	mine.setScale(glm::vec3(0.3));
+	assetsRepository->registerMesh("mine", "models/mine.obj");
+	Mesh* mineMesh = assetsRepository->getMesh("mine");
+	mineMesh->setTexture(mineBuilding);
+	mineMesh->setHeightmap(heightmap);
+	mineMesh->setPosition(glm::vec2(0.0));
+	mine.setMesh(mineMesh);
+	mine.setMaterial(mineMaterial);
+	mine.setProgram(buildingProgram);
+	mine.name = "mine";
+	models.push_back(mine);
+
+	assetsRepository->registerTexture("houseBuilding", "textures/house.png", GL_RGB);
+	Texture* houseBuilding = assetsRepository->getTexture("houseBuilding");
+	Material* houseMaterial = new Material();
+	houseMaterial->setAmbient(glm::vec3(0.2, 0.2, 0.2));
+	houseMaterial->setDiffuse(glm::vec3(1.0, 1.0, 1.0));
+	houseMaterial->setSpecular(glm::vec3(2.0, 2.0, 2.0));
+	houseMaterial->setShininess(32.0f);
+	Model house;
+	house.setMatrix(glm::mat4(1.0));
+	house.setScale(glm::vec3(0.3));
+	assetsRepository->registerMesh("house", "models/house.obj");
+	Mesh* houseMesh = assetsRepository->getMesh("house");
+	houseMesh->setTexture(houseBuilding);
+	houseMesh->setHeightmap(heightmap);
+	houseMesh->setPosition(glm::vec2(0.0));
+	house.setMesh(houseMesh);
+	house.setMaterial(houseMaterial);
+	house.setProgram(buildingProgram);
+	house.name = "house";
+	models.push_back(house);
 }
 
 void FrameCallback(int i)
@@ -703,24 +907,6 @@ void FrameCallback(int i)
 		}
 		else {
 			light->setPosition(glm::vec3(2.0, 3.2, 1.0));
-		}
-	}
-	for (Model& model : models) {
-		if (model.name == "cube") {
-			glm::mat4 x = model.getMatrix();
-			glm::mat4 y = glm::rotate(x, one_degree / 2, glm::vec3(0.0, 1.0, 0.0));
-			model.setMatrix(y);
-		}
-		else if (model.name == "monkey") {
-			glm::mat4 x = model.getMatrix();
-			glm::mat4 y = glm::rotate(x, one_degree / 2, glm::vec3(0.0, 1.0, 0.0));
-			glm::mat4 z = glm::translate(x, glm::vec3(sin(time(NULL))/10, 0.0, cos(time(NULL)) / 10));
-			model.setMatrix(z);
-		}
-		else if (model.name == "sphere") {
-			glm::mat4 x = glm::translate(glm::mat4(1.0), Renderer::getInstance().getLights()[0]->getPosition());
-			x = glm::scale(x, glm::vec3(0.25, 0.25, 0.25));
-			model.setMatrix(x);
 		}
 	}
 	glutTimerFunc(1000.f / 60, FrameCallback, 0);
@@ -760,15 +946,62 @@ void Reshape(int width, int height)
 	}
 }
 
+
+void build() {
+	if(validSpot(glm::vec2(worldPoint.x, worldPoint.z)) == 2) return;
+	Model toBuildModel;
+	int idx = 0;
+	for (Model model : models) {
+		if (idx != selected) {
+			idx++;
+			continue;
+		}
+		toBuildModel = model;
+		idx++;
+	}
+	Model newModel;
+	newModel.setMatrix(glm::translate(toBuildModel.getMatrix(), worldPoint));
+	Mesh* newMesh = Mesh::clone(assetsRepository->getMesh(toBuildModel.name));
+	newMesh->setPosition(glm::vec2(worldPoint.x, worldPoint.z));
+	newModel.setScale(toBuildModel.getScale());
+	newModel.setMesh(newMesh);
+	newModel.setMaterial(toBuildModel.getMaterial());
+	newModel.setProgram(toBuildModel.getProgram());
+	newModel.name = toBuildModel.name;
+	buildings.push_back(newModel);
+	woodCount -= needWood(newModel.name);
+	rockCount -= needRock(newModel.name);
+	if (newModel.name == "castle") castleCount++;
+	if (newModel.name == "sawmill") sawmillCount++;
+	if (newModel.name == "mine") mineCount++;
+	if (newModel.name == "house") houseCount++;
+}
 // ---------------------------------------------------
 void Keyboard(unsigned char key, int x, int y)
 {
 	switch (key)
 	{
-	case 27:	// ESC key
-		glutLeaveMainLoop();
-		break;
-
+		case '1':
+			selected = 0;
+			break;
+		case '2':
+			selected = 1;
+			break;
+		case '3':
+			selected = 2;
+			break;
+		case '4':
+			selected = 3;
+			break;
+		case 13:
+			build();
+			break;
+		case 32:
+			build();
+			break;
+		case 27:	// ESC key
+			glutLeaveMainLoop();
+			break;
 	}
 }
 void processMenu(int option) {
@@ -946,16 +1179,29 @@ void createMenu() {
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
 }
 
+void addResources(int value) {
+	for (Model model : buildings) {
+		std::cout << "name: " << model.name << std::endl;
+		if (model.name == "mine") rockCount++;
+		if (model.name == "sawmill") woodCount++;
+	}
+	glutTimerFunc(1000, addResources, 0);
+}
+
 // ---------------------------------------------------
 int main(int argc, char* argv[])
 {
+	if (argc > 1) {
+		main_seed = std::stoi(argv[1]);
+	}
+
 	// GLUT
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH | GLUT_STENCIL);
 	glutInitContextVersion(3, 2);
 	glutInitContextProfile(GLUT_CORE_PROFILE);
 	glutInitWindowSize(600, 600);
-	glutCreateWindow("Programownie grafiki 3D w OpenGL");
+	glutCreateWindow("Medival builder - projekt OpenGL - Patryk Morawski");
 
 	__CHECK_FOR_ERRORS;
 	glutDisplayFunc(Render);
@@ -963,9 +1209,11 @@ int main(int argc, char* argv[])
 	glutMouseFunc(MouseButton);
 	glutMotionFunc(MouseMotion);
 	glutMouseWheelFunc(MouseWheel);
+	glutPassiveMotionFunc(PassiveMouseMotion);
 	glutKeyboardFunc(Keyboard);
 	glutSpecialFunc(SpecialKeys);
 	glutTimerFunc(1000.0 / 60.0, FrameCallback, 0);
+	glutTimerFunc(1000, addResources, 0);
 	//createMenu();
 
 

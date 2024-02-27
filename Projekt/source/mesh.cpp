@@ -70,31 +70,54 @@ Texture* Mesh::getTexture() {
 	return texture;
 }
 
+void Mesh::setHeightmap(Texture* newHeightmap) {
+	heightmap = newHeightmap;
+}
 std::vector<glm::vec3> Mesh::getVertices() {
 	return vertices;
 }
 
-void Mesh::draw(Program* program, glm::mat4& matrix, glm::vec3& cameraPos, glm::mat4& matProj, glm::mat4& matView, Material* material, glm::vec3& color) {
+void Mesh::setPosition(glm::vec2 newPosition) {
+	position = newPosition;
+}
+glm::vec2 Mesh::getPosition() {
+	return position;
+}
+
+void Mesh::setState(int newState) {
+	state = newState;
+}
+int Mesh::getState() {
+	return state;
+}
+
+void Mesh::draw(Program* program, glm::mat4& matrix, glm::vec3& cameraPos, glm::mat4& matProj, glm::mat4& matView, Material* material, glm::vec3& color, glm::vec3& scale) {
 	GLuint programId = program->getId();
 	glUseProgram(programId);
 	glUniformMatrix4fv(glGetUniformLocation(programId, "matProj"), 1, GL_FALSE, glm::value_ptr(matProj));
 	glUniformMatrix4fv(glGetUniformLocation(programId, "matView"), 1, GL_FALSE, glm::value_ptr(matView));
 	glUniformMatrix4fv(glGetUniformLocation(programId, "matModel"), 1, GL_FALSE, glm::value_ptr(matrix));
+	glUniform2fv(glGetUniformLocation(programId, "worldPosition"), 1,glm::value_ptr(position));
 	glUniform3fv(glGetUniformLocation(programId, "cameraPos"), 1, &cameraPos[0]);
 	glUniform3fv(glGetUniformLocation(programId, "color"), 1, &color[0]);
+	glUniform3fv(glGetUniformLocation(programId, "scale"), 1, &scale[0]);
+	glUniform1i(glGetUniformLocation(programId, "state"), state);
 
 	bool useTexture = (texture != nullptr && texture->getId() != NULL);
 	if (useTexture) {
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture->getId());
 		glUniform1i(glGetUniformLocation(programId, "tex"), 0);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, heightmap->getId());
+		glUniform1i(glGetUniformLocation(programId, "heightmap"), 1);
 	}
 	glUniform1i(glGetUniformLocation(programId, "useTexture"), useTexture);
 	glUniformMatrix4fv(glGetUniformLocation(programId, "lightProj"), 1, GL_FALSE, glm::value_ptr(Renderer::getInstance().getLightProj()));
 	glUniformMatrix4fv(glGetUniformLocation(programId, "lightView"), 1, GL_FALSE, glm::value_ptr(Renderer::getInstance().getLightView()));
-	glActiveTexture(GL_TEXTURE1);
+	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, Renderer::getInstance().getShadowTexture()->getId());
-	glUniform1i(glGetUniformLocation(programId, "shadowMap"), 1);
+	glUniform1i(glGetUniformLocation(programId, "shadowMap"), 2);
 
 	bool useMaterial = (material != nullptr);
 	if (useMaterial) {
@@ -125,9 +148,9 @@ void Mesh::draw(Program* program, glm::mat4& matrix, glm::vec3& cameraPos, glm::
 	}
 
 
-	glActiveTexture(GL_TEXTURE2);
+	glActiveTexture(GL_TEXTURE3);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, Renderer::getInstance().getSkyBoxes().at(Settings::getInstance().skyBox)->getTextureId());
-	glUniform1i(glGetUniformLocation(programId, "tex_skybox"), 2);
+	glUniform1i(glGetUniformLocation(programId, "tex_skybox"), 3);
 	
 	glUniform1i(glGetUniformLocation(programId, "lightVisibility"), Settings::getInstance().lightVisibility);
 	glUniform1i(glGetUniformLocation(programId, "lightMode"), Settings::getInstance().lightMode);
@@ -141,6 +164,29 @@ void Mesh::draw(Program* program, glm::mat4& matrix, glm::vec3& cameraPos, glm::
 	glDrawArrays(GL_TRIANGLES, 0, vertices.size());
 }
 
+Mesh* Mesh::clone(const Mesh* original) {
+	if (!original)
+		return nullptr; // Handle null pointer
+
+	Mesh* clonedObject = new Mesh();
+	if (!clonedObject)
+		return nullptr; // Handle allocation failure
+
+	// Copy each member from the original object to the cloned object
+	clonedObject->vertices = original->vertices;
+	clonedObject->uvs = original->uvs;
+	clonedObject->normals = original->normals;
+	clonedObject->position = original->position;
+	clonedObject->VAO = original->VAO;
+	clonedObject->verticesVBO = original->verticesVBO;
+	clonedObject->uvsVBO = original->uvsVBO;
+	clonedObject->normalsVBO = original->normalsVBO;
+	clonedObject->texture = original->texture ? new Texture(*original->texture) : nullptr;
+	clonedObject->heightmap = original->heightmap ? new Texture(*original->heightmap) : nullptr;
+	clonedObject->state = original->state;
+
+	return clonedObject;
+}
 Mesh::Mesh() {
 	glGenVertexArrays(1, &VAO);
 }

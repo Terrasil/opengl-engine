@@ -22,7 +22,12 @@ GLfloat CameraTranslate_z = -2.0f;
 GLfloat CameraTranslateOffset_x = 0.0f;
 GLfloat CameraTranslateOffset_y = 0.0f;
 GLfloat CameraTranslateOffset_z = 0.0f;
-
+glm::mat4 CameraMatProj;
+glm::mat4 CameraMatView;
+int _mouse_X;
+int _mouse_Y;
+float winZ;
+glm::vec3 worldPoint;
 // Zmienne do kontroli stanu myszy
 int _mouse_buttonState = GLUT_UP;
 int _mouse_buttonX;
@@ -42,7 +47,7 @@ glm::mat4 UpdateViewMatrix()
 	matView = glm::rotate(matView, CameraRotate_x, glm::vec3(1.0f, 0.0f, 0.0f));
 	matView = glm::rotate(matView, CameraRotate_y, glm::vec3(0.0f, 1.0f, 0.0f));
 	matView = glm::translate(matView, glm::vec3(CameraTranslateOffset_x, CameraTranslateOffset_y, CameraTranslateOffset_z));
-
+	CameraMatView = matView;
 	return matView;
 }
 
@@ -129,6 +134,14 @@ void SpecialKeys(int key, int x, int y)
 // --------------------------------------------------------------
 void MouseButton(int button, int state, int x, int y)
 {
+	if (state == GLUT_DOWN)
+	{
+		//_mouse_X = x;
+		//_mouse_Y = y;
+		//worldPoint = glm::unProject(glm::vec3(x, glutGet(GLUT_WINDOW_HEIGHT) - y, winZ), CameraMatView, CameraMatProj, glm::vec4(0, 0, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT)));
+		//worldPoint.y = 0;
+		std::cout << "winZ: " << winZ << " pos x: " << worldPoint.x << " z: " << worldPoint.z << std::endl;
+	}
 	if (button == GLUT_LEFT_BUTTON)
 	{
 		_mouse_buttonState = state;
@@ -178,7 +191,16 @@ void MouseMotion(int x, int y)
 		glutPostRedisplay();
 	}
 }
-
+// --------------------------------------------------------------
+// Funkcja zwrotna wywolywana podczas pasywnego ruchu kursorem myszy
+// --------------------------------------------------------------
+void PassiveMouseMotion(int x, int y)
+{
+	_mouse_X = x;
+	_mouse_Y = y;
+	worldPoint = glm::unProject(glm::vec3(x, glutGet(GLUT_WINDOW_HEIGHT) - y, winZ), CameraMatView, CameraMatProj, glm::vec4(0, 0, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT)));
+	worldPoint.y = 0;
+}
 // --------------------------------------------------------------
 // Funkcja wywolywana podczas ruchu rolki myszy
 // --------------------------------------------------------------

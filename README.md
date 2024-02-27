@@ -60,7 +60,7 @@ Patryk Morawski 288115
 
 - [x] Zadanie 1
 - [x] Zadanie 2
-- [ ] Zadanie 3
+- [x] Zadanie 3
 
 #### Wyklad 10 - Rendering pozaekranowy c.d.
 

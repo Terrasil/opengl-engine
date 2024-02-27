@@ -4,16 +4,23 @@
 
 ### Założenia
 
-Gracz rozbudowuje swoje miasto. Zbiera zasoby na mapie oraz rozbudowuje armię aby móc się obronić przed przeciwnikami którzy pojawiają się nocą.
+Gracz rozbudowuje swoje miasto. Zbiera zasoby na mapie oraz rozbudowuje miasto.
 
-### Funkcjonalności
+### Wykonanie
 
-- [ ] Budowanie miasta
-- [ ] Interfejs użytkownika pokazujący ilość zasobów oraz umożliwiający budowanie
-- [ ] Walka z przeciwnikami (system dnia i nocy) + system pathfindingu
-- [ ] Pauzowanie gry oraz ustawienia
-- [ ] System zapisów gry (.save)
+- [x] Proceduralnie generowana mapa za pomocą ziarna
+- [x] Budowanie miasta (cztery budynki Zamek, Tartak, Komaplnia i Dom)
+- [x] Interfejs użytkownika pokazujący ilość zasobów oraz umożliwiający budowanie (wymagane surowce oraz wybór budynków)
 
-### Dodatkowo
+### Wykorzystane funkcjonalności
 
-- [ ] System modyfikacji (/mods)
+- Światło punktowe
+- Cienie
+- Generacja teneru za pomoca perlin noice
+- Renderowanie instancyjne
+- Skybox
+- Postprocess w postaci vinety
+- Minimapa
+- Renderownie interfejsu (ikony i tekst)
+- Odczyt pozycji kursowa w swiecie gry
+- Wolna kamera (LPM - poruszanie, PPM - obracanie)

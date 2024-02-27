@@ -53,16 +53,31 @@ void Model::setMaterial(Material* newMaterial) {
 	material = newMaterial;
 }
 
+Material* Model::getMaterial() {
+	return material;
+}
+void Model::setPosition(glm::vec2 newPosition) {
+	mesh->setPosition(newPosition);
+}
+glm::vec2 Model::getPosition() {
+	return mesh->getPosition();
+}
+void Model::setScale(glm::vec3 newScale) {
+	scale = newScale;
+}
+glm::vec3 Model::getScale() {
+	return scale;
+}
 void Model::draw(glm::vec3& cameraPos, glm::mat4& matProj, glm::mat4& matView) {
 	glm::vec3 color = glm::vec3(0.0);
-	mesh->draw(program, matrix, cameraPos, matProj, matView, material, color);
+	mesh->draw(program, matrix, cameraPos, matProj, matView, material, color, scale);
 }
 void Model::draw(Program* program, glm::vec3& cameraPos, glm::mat4& matProj, glm::mat4& matView) {
 	glm::vec3 color = glm::vec3(0.0);
-	mesh->draw(program, matrix, cameraPos, matProj, matView, material, color);
+	mesh->draw(program, matrix, cameraPos, matProj, matView, material, color, scale);
 }
 void Model::draw(glm::vec3& cameraPos, glm::mat4& matProj, glm::mat4& matView, glm::vec3& color) {
-	mesh->draw(program, matrix, cameraPos, matProj, matView, material, color);
+	mesh->draw(program, matrix, cameraPos, matProj, matView, material, color, scale);
 }
 
 Model::Model() {
