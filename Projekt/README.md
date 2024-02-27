@@ -28,7 +28,11 @@ Gracz zbiera zasoby na mapie oraz rozbudowuje miasto.
 ### Sterowanie
 
 [LPM] - poruszanie kamerą
+
 [PPM] - obracanie kamery
+
 [E] - obróć w prawo
+
 [Q] - obróć w lewo
+
 [ENTER]/[SPACE] - zbuduj
