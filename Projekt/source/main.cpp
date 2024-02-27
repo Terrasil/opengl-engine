@@ -78,6 +78,7 @@ int mineCount = 0;
 int houseCount = 0;
 
 int selected = 0;
+float rotation = 0.0;
 std::string selectedName = "castle";
 
 unsigned char* newData = new unsigned char[256 * 256 * 4];
@@ -102,7 +103,7 @@ int needRock(std::string name) {
 		return sawmillCount * 2;
 	}
 	if (name == "mine") {
-		return std::pow(2, houseCount) / 2;
+		return std::pow(2, mineCount) / 2;
 	}
 	if (name == "house") {
 		return std::pow(2, houseCount) / 2;
@@ -193,6 +194,7 @@ void DisplayScene()
 		}
 		model.getMesh()->setState(validSpot(glm::vec2(worldPoint.x, worldPoint.z)));
 		model.setMatrix(glm::translate(model.getMatrix(), worldPoint));
+		model.setMatrix(glm::rotate(model.getMatrix(), rotation, glm::vec3(0.0, 1.0, 0.0)));
 		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
 		model.setPosition(glm::vec2(worldPoint.x, worldPoint.z));
 		model.draw(cameraPos, matProj, matView);
@@ -200,6 +202,7 @@ void DisplayScene()
 	}
 	for (Model model : buildings) {
 		model.getMesh()->setState(0);
+		model.setMatrix(glm::rotate(model.getMatrix(), model.getRotation(), glm::vec3(0.0, 1.0, 0.0)));
 		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
 		model.draw(cameraPos, matProj, matView);
 	}
@@ -224,6 +227,7 @@ void Minimap()
 	Renderer::getInstance().getTerrain()->draw(cameraPos, minimapProj, matView);
 	for (Model model : buildings) {
 		model.getMesh()->setState(0);
+		model.setMatrix(glm::rotate(model.getMatrix(), model.getRotation(), glm::vec3(0.0, 1.0, 0.0)));
 		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
 		model.draw(cameraPos, minimapProj, matView);
 	}
@@ -270,6 +274,7 @@ void Shadows()
 			continue; 
 		}
 		model.setMatrix(glm::translate(model.getMatrix(), worldPoint));
+		model.setMatrix(glm::rotate(model.getMatrix(), rotation, glm::vec3(0.0, 1.0, 0.0)));
 		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
 		model.setPosition(glm::vec2(worldPoint.x, worldPoint.z));
 		model.draw(lightPosition, lightProj, lightView);
@@ -277,6 +282,7 @@ void Shadows()
 		idx++;
 	}
 	for (Model model : buildings) {
+		model.setMatrix(glm::rotate(model.getMatrix(), model.getRotation(), glm::vec3(0.0, 1.0, 0.0)));
 		model.setMatrix(glm::scale(model.getMatrix(), model.getScale()));
 		model.draw(lightPosition, lightProj, lightView);
 	}
@@ -821,7 +827,7 @@ void Initialize()
 	castleMaterial->setShininess(32.0f);
 	Model castle;
 	castle.setMatrix(glm::mat4(1.0));
-	castle.setScale(glm::vec3(1.0));
+	castle.setScale(glm::vec3(0.7));
 	assetsRepository->registerMesh("castle", "models/castle.obj");
 	Mesh* castleMesh = assetsRepository->getMesh("castle");
 	castleMesh->setTexture(castleBuilding);
@@ -863,7 +869,7 @@ void Initialize()
 	mineMaterial->setShininess(32.0f);
 	Model mine;
 	mine.setMatrix(glm::mat4(1.0));
-	mine.setScale(glm::vec3(0.3));
+	mine.setScale(glm::vec3(0.5));
 	assetsRepository->registerMesh("mine", "models/mine.obj");
 	Mesh* mineMesh = assetsRepository->getMesh("mine");
 	mineMesh->setTexture(mineBuilding);
@@ -884,7 +890,7 @@ void Initialize()
 	houseMaterial->setShininess(32.0f);
 	Model house;
 	house.setMatrix(glm::mat4(1.0));
-	house.setScale(glm::vec3(0.3));
+	house.setScale(glm::vec3(0.5));
 	assetsRepository->registerMesh("house", "models/house.obj");
 	Mesh* houseMesh = assetsRepository->getMesh("house");
 	houseMesh->setTexture(houseBuilding);
@@ -963,6 +969,7 @@ void build() {
 	newModel.setMatrix(glm::translate(toBuildModel.getMatrix(), worldPoint));
 	Mesh* newMesh = Mesh::clone(assetsRepository->getMesh(toBuildModel.name));
 	newMesh->setPosition(glm::vec2(worldPoint.x, worldPoint.z));
+	newModel.setRotation(rotation);
 	newModel.setScale(toBuildModel.getScale());
 	newModel.setMesh(newMesh);
 	newModel.setMaterial(toBuildModel.getMaterial());
@@ -992,6 +999,16 @@ void Keyboard(unsigned char key, int x, int y)
 			break;
 		case '4':
 			selected = 3;
+			break;
+		case 'q':
+		case 'Q':
+			rotation -= 0.1;
+			std::cout << "rotation: " << rotation << std::endl;
+			break;
+		case 'e':
+		case 'E':
+			rotation += 0.1;
+			std::cout << "rotation: " << rotation << std::endl;
 			break;
 		case 13:
 			build();
@@ -1181,7 +1198,6 @@ void createMenu() {
 
 void addResources(int value) {
 	for (Model model : buildings) {
-		std::cout << "name: " << model.name << std::endl;
 		if (model.name == "mine") rockCount++;
 		if (model.name == "sawmill") woodCount++;
 	}

@@ -134,14 +134,6 @@ void SpecialKeys(int key, int x, int y)
 // --------------------------------------------------------------
 void MouseButton(int button, int state, int x, int y)
 {
-	if (state == GLUT_DOWN)
-	{
-		//_mouse_X = x;
-		//_mouse_Y = y;
-		//worldPoint = glm::unProject(glm::vec3(x, glutGet(GLUT_WINDOW_HEIGHT) - y, winZ), CameraMatView, CameraMatProj, glm::vec4(0, 0, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT)));
-		//worldPoint.y = 0;
-		std::cout << "winZ: " << winZ << " pos x: " << worldPoint.x << " z: " << worldPoint.z << std::endl;
-	}
 	if (button == GLUT_LEFT_BUTTON)
 	{
 		_mouse_buttonState = state;

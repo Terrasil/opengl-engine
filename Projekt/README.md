@@ -4,7 +4,7 @@
 
 ### Założenia
 
-Gracz rozbudowuje swoje miasto. Zbiera zasoby na mapie oraz rozbudowuje miasto.
+Gracz zbiera zasoby na mapie oraz rozbudowuje miasto.
 
 ### Wykonanie
 
@@ -24,3 +24,11 @@ Gracz rozbudowuje swoje miasto. Zbiera zasoby na mapie oraz rozbudowuje miasto.
 - Renderownie interfejsu (ikony i tekst)
 - Odczyt pozycji kursowa w swiecie gry
 - Wolna kamera (LPM - poruszanie, PPM - obracanie)
+
+### Sterowanie
+
+[LPM] - poruszanie kamerą
+[PPM] - obracanie kamery
+[E] - obróć w prawo
+[Q] - obróć w lewo
+[ENTER]/[SPACE] - zbuduj

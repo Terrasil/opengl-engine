@@ -68,6 +68,12 @@ void Model::setScale(glm::vec3 newScale) {
 glm::vec3 Model::getScale() {
 	return scale;
 }
+void Model::setRotation(float newRotation) {
+	rotation = newRotation;
+}
+float Model::getRotation() {
+	return rotation;
+}
 void Model::draw(glm::vec3& cameraPos, glm::mat4& matProj, glm::mat4& matView) {
 	glm::vec3 color = glm::vec3(0.0);
 	mesh->draw(program, matrix, cameraPos, matProj, matView, material, color, scale);
