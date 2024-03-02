@@ -36,3 +36,7 @@ Gracz zbiera zasoby na mapie oraz rozbudowuje miasto.
 [Q] - obróć w lewo
 
 [ENTER]/[SPACE] - zbuduj
+
+### Screen z gry
+
+![Screen z gry](screen.png)
